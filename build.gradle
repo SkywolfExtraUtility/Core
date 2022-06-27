@@ -1,0 +1,68 @@
+plugins {
+    id "org.jetbrains.kotlin.jvm" version "1.7.0"
+    id 'maven-publish'
+}
+
+configurations {
+    include
+    compileOnly {
+        extendsFrom include
+    }
+}
+
+repositories {
+    mavenCentral()
+    maven {
+        url = uri(rootProject.properties["reposilite.release"])
+        allowInsecureProtocol(true)
+    }
+    maven {
+        url = uri(rootProject.properties["reposilite.spigot"])
+        allowInsecureProtocol(true)
+    }
+}
+
+
+processResources {
+    filesMatching(["loaderDeclaration.properties", "plugin.yml", "bungee.yml"]*.toString()) {
+        expand(["version": rootProject.properties["version"] as String])
+    }
+    outputs.upToDateWhen { false }
+}
+
+
+publishing {
+    repositories {
+        maven {
+            name = "Reposilite"
+            url(rootProject.properties["snapshot"] as Boolean ? rootProject.properties['reposilite.snapshot'] as String : rootProject.properties['reposilite.release'] as String)
+            allowInsecureProtocol(true)
+            credentials {
+                username rootProject.properties['reposilite.user'] as String
+                password rootProject.properties['reposilite.token'] as String
+            }
+        }
+    }
+    publications {
+        create("jar", MavenPublication) {
+            groupId 'skywolf46'
+            artifactId "extrautility-core"
+            version rootProject.properties['version'] as String
+            from components.java
+        }
+    }
+}
+
+
+dependencies {
+    include "org.jetbrains.kotlin:kotlin-stdlib"
+    include group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
+    include group: "io.github.classgraph", name: 'classgraph', version: '4.8.126'
+}
+
+jar {
+    duplicatesStrategy(DuplicatesStrategy.INCLUDE)
+    configurations.getByName("include").forEach {
+        from(zipTree(it))
+    }
+}

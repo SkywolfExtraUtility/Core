@@ -1,0 +1,6 @@
+name: ExtraUtilCore
+loadBefore:
+  - ExtraUtilityCore
+requires:
+  ExtraUtilityCore:
+    force: true
