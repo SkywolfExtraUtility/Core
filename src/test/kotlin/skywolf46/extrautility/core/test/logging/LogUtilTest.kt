@@ -1,6 +1,7 @@
 package skywolf46.extrautility.core.test.logging
 
-import org.junit.jupiter.api.Assertions.*
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertNull
 import org.junit.jupiter.api.MethodOrderer
 import org.junit.jupiter.api.Order
 import org.junit.jupiter.api.Test
@@ -9,7 +10,7 @@ import skywolf46.extrautility.core.util.*
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
 class LogUtilTest {
-    val prefix = "ExtraUtility - TestLogging | "
+    private val prefix = "ExtraUtility - TestLogging | "
 
     @Order(0)
     @Test
