@@ -33,9 +33,16 @@ class LogUtilTest {
 
     @Test
     @Order(3)
+    fun testNonExistsPrefix() {
+        assertNull(findPrefixFor("skywolf46.e"))
+    }
+
+    @Test
+    @Order(3)
     fun testAppendedMessageWithEmptyString() {
         assertEquals(prefix, appendPrefix(""))
     }
+
 
     @Test
     @Order(3)

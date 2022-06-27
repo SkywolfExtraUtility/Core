@@ -1,11 +1,15 @@
 plugins {
     id "org.jetbrains.kotlin.jvm" version "1.7.0"
     id 'maven-publish'
+    id 'jacoco'
 }
 
 configurations {
     include
     compileOnly {
+        extendsFrom include
+    }
+    testImplementation {
         extendsFrom include
     }
 }
@@ -53,16 +57,36 @@ publishing {
     }
 }
 
-
 dependencies {
     include "org.jetbrains.kotlin:kotlin-stdlib"
     include group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
     include group: "io.github.classgraph", name: 'classgraph', version: '4.8.126'
+    testImplementation('org.junit.jupiter:junit-jupiter-engine:5.8.2')
+    testImplementation('org.junit.jupiter:junit-jupiter-params:5.8.2')
+    testImplementation('org.junit.platform:junit-platform-runner:1.8.2')
 }
 
 jar {
     duplicatesStrategy(DuplicatesStrategy.INCLUDE)
     configurations.getByName("include").forEach {
         from(zipTree(it))
+    }
+}
+
+
+test {
+    useJUnitPlatform()
+    finalizedBy jacocoTestReport
+}
+
+jacoco {
+    toolVersion = '0.8.7'
+}
+
+jacocoTestReport {
+    reports {
+        html.enabled true
+        xml.enabled true
+        csv.enabled false
     }
 }
