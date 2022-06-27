@@ -31,3 +31,29 @@ fun <T : Any> Iterable<T>.anyIndexed(unit: T.(Int) -> Boolean): Boolean {
     }
     return false
 }
+
+fun <T : Any> Array<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
+    forEachIndexed { index, t ->
+        if (!unit(t, index))
+            return false
+    }
+    return true
+}
+
+
+fun <T : Any> Array<T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
+    forEachIndexed { index, t ->
+        if (unit(t, index))
+            return false
+    }
+    return true
+}
+
+
+fun <T : Any> Array<T>.anyIndexed(unit: T.(Int) -> Boolean): Boolean {
+    forEachIndexed { index, t ->
+        if (unit(t, index))
+            return true
+    }
+    return false
+}
