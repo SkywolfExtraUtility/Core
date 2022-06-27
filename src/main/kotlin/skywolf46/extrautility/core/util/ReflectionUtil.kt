@@ -2,14 +2,13 @@ package skywolf46.extrautility.core.util
 
 import io.github.classgraph.ClassGraph
 import skywolf46.extrautility.core.abstraction.JvmFilter
-import kotlin.reflect.KAnnotatedElement
-import kotlin.reflect.KClass
-import kotlin.reflect.KFunction
-import kotlin.reflect.KProperty
-import kotlin.reflect.full.declaredFunctions
-import kotlin.reflect.full.declaredMemberExtensionProperties
-import kotlin.reflect.full.declaredMemberProperties
-import kotlin.reflect.full.findAnnotations
+import skywolf46.extrautility.core.definition.JvmModifier
+import kotlin.reflect.*
+import kotlin.reflect.full.*
+import kotlin.reflect.jvm.isAccessible
+import kotlin.reflect.jvm.javaConstructor
+import kotlin.reflect.jvm.javaMethod
+import kotlin.reflect.jvm.jvmErasure
 
 object ReflectionUtil {
     val ignoreList = mutableListOf<String>()
@@ -83,6 +82,15 @@ object ReflectionUtil {
     }
 
     class ReflectionFilterContainer<T : KAnnotatedElement>(private val data: List<T>) : Iterable<T> {
+        fun unlock(): ReflectionFilterContainer<T> {
+            if (data.isEmpty() || data[0] !is KCallable<*>)
+                return this
+            data.forEach {
+                (it as KCallable<*>).isAccessible = true
+            }
+            return this
+        }
+
         fun filter(filter: JvmFilter<T>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter { filter.isSatisfied(it) }
@@ -129,4 +137,49 @@ object ReflectionUtil {
             return data.iterator()
         }
     }
+
+    class CallableFunction<T>(val instance: Any?, val function: KFunction<*>) {
+        fun parameter(): List<KParameter> {
+            return function.parameters
+        }
+
+        fun parameterCount(): Int {
+            return parameter().size
+        }
+
+        fun doReturn(cls: KClass<*>): Boolean {
+            return cls.isSuperclassOf(function.returnType.jvmErasure)
+        }
+
+        fun doAccept(vararg cls: KClass<*>): Boolean {
+            val parameters = parameter()
+            return parameters.size == cls.size
+                    && cls.allIndexed { cls[it].isSuperclassOf(parameters[it].type.jvmErasure) }
+        }
+
+        fun invoke(vararg parameter: Any?) {
+            // TODO
+        }
+    }
+}
+
+fun <T : Any> KFunction<T>.asCallable(instance: Any? = null): ReflectionUtil.CallableFunction<T> {
+    if (instance == null) {
+        return asSingletonCallable()
+    }
+    return ReflectionUtil.CallableFunction(instance, this)
+}
+
+internal fun <T : Any> KFunction<T>.asSingletonCallable(): ReflectionUtil.CallableFunction<T> {
+    if (JvmModifier.isStatic((javaMethod ?: javaConstructor)!!.modifiers)) {
+        return ReflectionUtil.CallableFunction(null, this)
+    }
+    val declaringClass = (javaMethod ?: javaConstructor)!!.declaringClass.kotlin
+    if (declaringClass.isCompanion) {
+        return ReflectionUtil.CallableFunction(declaringClass.companionObject, this)
+    }
+    declaringClass.objectInstance?.let { instance ->
+        return ReflectionUtil.CallableFunction(instance, this)
+    }
+    throw IllegalStateException("Cannot convert instance required function to singleton callable")
 }
