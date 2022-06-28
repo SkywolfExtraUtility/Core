@@ -1,4 +1,4 @@
-package skywolf46.extrautility.core.test.logging
+package skywolf46.extrautility.core.test.suites.logging
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertNull
@@ -21,7 +21,7 @@ class LogUtilTest {
     @Test
     @Order(1)
     fun registerLogPrefix() {
-        bindPrefix("skywolf46.extrautility.core.test.logging", prefix)
+        bindPrefix("skywolf46.extrautility.core.test.suites.logging", prefix)
     }
 
     @Test

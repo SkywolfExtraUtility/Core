@@ -1,4 +1,4 @@
-package skywolf46.extrautility.core.test.stream
+package skywolf46.extrautility.core.test.suites.stream
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.MethodOrderer.OrderAnnotation

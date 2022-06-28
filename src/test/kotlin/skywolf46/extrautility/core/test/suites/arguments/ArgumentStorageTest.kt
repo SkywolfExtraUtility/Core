@@ -1,4 +1,4 @@
-package skywolf46.extrautility.core.test.arguments
+package skywolf46.extrautility.core.test.suites.arguments
 
 import org.junit.jupiter.api.Assertions.*
 import org.junit.jupiter.api.MethodOrderer
