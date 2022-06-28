@@ -1,6 +1,6 @@
 package skywolf46.extrautility.core.util
 
-fun <T : Any> Iterable<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
+inline fun <T : Any> Iterable<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
     if (this is Collection && isEmpty())
         return true
     forEachIndexed { index, t ->
@@ -11,7 +11,17 @@ fun <T : Any> Iterable<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
 }
 
 
-fun <T : Any> Iterable<T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
+inline fun <T : Any> Iterable<T>.anyIndexed(unit: T.(Int) -> Boolean): Boolean {
+    if (this is Collection && isEmpty())
+        return false
+    forEachIndexed { index, t ->
+        if (unit(t, index))
+            return true
+    }
+    return false
+}
+
+inline fun <T : Any> Iterable<T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
     if (this is Collection && isEmpty())
         return true
     forEachIndexed { index, t ->
@@ -22,17 +32,9 @@ fun <T : Any> Iterable<T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
 }
 
 
-fun <T : Any> Iterable<T>.anyIndexed(unit: T.(Int) -> Boolean): Boolean {
-    if (this is Collection && isEmpty())
+inline fun <T : Any> Array<out T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
+    if (isEmpty())
         return true
-    forEachIndexed { index, t ->
-        if (unit(t, index))
-            return true
-    }
-    return false
-}
-
-fun <T : Any> Array<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
     forEachIndexed { index, t ->
         if (!unit(t, index))
             return false
@@ -40,8 +42,19 @@ fun <T : Any> Array<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
     return true
 }
 
+fun <T : Any> Array<out T>.anyIndexed(unit: T.(Int) -> Boolean): Boolean {
+    if (isEmpty())
+        return false
+    forEachIndexed { index, t ->
+        if (unit(t, index))
+            return true
+    }
+    return false
+}
 
-fun <T : Any> Array<T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
+inline fun <T : Any> Array<out T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
+    if (isEmpty())
+        return true
     forEachIndexed { index, t ->
         if (unit(t, index))
             return false
@@ -49,11 +62,3 @@ fun <T : Any> Array<T>.noneIndexed(unit: T.(Int) -> Boolean): Boolean {
     return true
 }
 
-
-fun <T : Any> Array<T>.anyIndexed(unit: T.(Int) -> Boolean): Boolean {
-    forEachIndexed { index, t ->
-        if (unit(t, index))
-            return true
-    }
-    return false
-}
