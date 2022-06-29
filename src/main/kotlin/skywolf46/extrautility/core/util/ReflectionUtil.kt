@@ -3,13 +3,13 @@ package skywolf46.extrautility.core.util
 import io.github.classgraph.ClassGraph
 import skywolf46.extrautility.core.abstraction.JvmFilter
 import skywolf46.extrautility.core.definition.JvmModifier
-import java.lang.reflect.AnnotatedElement
-import java.lang.reflect.Field
-import java.lang.reflect.Method
-import kotlin.reflect.*
+import java.lang.reflect.*
+import kotlin.reflect.KClass
+import kotlin.reflect.KFunction
+import kotlin.reflect.KProperty
 import kotlin.reflect.full.companionObject
-import kotlin.reflect.full.isSuperclassOf
-import kotlin.reflect.jvm.*
+import kotlin.reflect.jvm.kotlinFunction
+import kotlin.reflect.jvm.kotlinProperty
 
 object ReflectionUtil {
     val ignoreList = mutableListOf<String>()
@@ -50,9 +50,10 @@ object ReflectionUtil {
         if (methodCache == null || reloadCache) {
             methodCache = ReflectionFilterContainer(mutableListOf<Method>().apply {
                 getClassCache(forceReloadClassCache, replaceClassLoader).forEach { cls ->
-                    cls.declaredMethods.forEach {
-                        if (it != null)
-                            this += it
+                    try {
+                        this += cls.declaredMethods
+                    } catch (e: Throwable) {
+                        // Ignore if failed to get methods
                     }
                 }
             })
@@ -68,7 +69,11 @@ object ReflectionUtil {
         if (fieldCache == null || reloadCache) {
             fieldCache = ReflectionFilterContainer(mutableListOf<Field>().apply {
                 getClassCache(forceReloadClassCache, replaceClassLoader).forEach {
-                    this += it.declaredFields
+                    try {
+                        this += it.declaredFields
+                    } catch (e: Throwable) {
+                        // Ignore if failed to get methods
+                    }
                 }
             })
         }
@@ -78,7 +83,7 @@ object ReflectionUtil {
         return ReflectionFilterContainer(classes)
     }
 
-    fun filterFunction(properties: List<Method>): ReflectionFilterContainer<Method> {
+    fun filterMethod(properties: List<Method>): ReflectionFilterContainer<Method> {
         return ReflectionFilterContainer(properties)
     }
 
@@ -103,10 +108,10 @@ object ReflectionUtil {
 
     class ReflectionFilterContainer<T : AnnotatedElement>(private val data: List<T>) : Iterable<T> {
         fun unlock(): ReflectionFilterContainer<T> {
-            if (data.isEmpty() || data[0] !is KCallable<*>)
+            if (data.isEmpty() || data[0] !is AccessibleObject)
                 return this
             data.forEach {
-                (it as KCallable<*>).isAccessible = true
+                (it as AccessibleObject).isAccessible = true
             }
             return this
         }
@@ -158,61 +163,237 @@ object ReflectionUtil {
         }
     }
 
-    open class CallableFunction(val instance: Any?, val function: KFunction<*>) {
-        fun parameter(): List<KParameter> {
-            return function.parameters
+    abstract class FunctionExecutor {
+        private var cachedParameter: List<Parameter>? = null
+
+        private var cachedReturnType: Class<*>? = null
+
+        internal abstract fun acquireParameter(): List<Parameter>
+
+        internal abstract fun acquireReturnType(): Class<*>
+
+        internal abstract fun getDeclaringClassName(): String
+
+        internal abstract fun getFunctionName(): String
+
+        internal abstract fun getFullName(): String
+
+        protected abstract fun execute(args: List<Any>): Any?
+
+        abstract fun <T : Annotation> findAnnotation(type: Class<T>): T?
+
+
+        fun invoke(args: List<Any>): Any? {
+            try {
+                return execute(args)
+            } catch (e: InvocationTargetException) {
+                throw e.cause ?: e
+            }
+        }
+
+        fun parameter(): List<Parameter> {
+            if (cachedParameter == null) {
+                cachedParameter = acquireParameter()
+            }
+            return cachedParameter!!.toList()
+        }
+
+        fun returnType(): Class<*> {
+            if (cachedReturnType == null) {
+                cachedReturnType = acquireReturnType()
+            }
+            return cachedReturnType!!
         }
 
         fun parameterCount(): Int {
             return parameter().size
         }
 
-        fun doReturn(cls: KClass<*>): Boolean {
-            return cls.isSuperclassOf(function.returnType.jvmErasure)
+    }
+
+    internal class DefaultFunctionExecutor(private val instance: Any?, private val function: Method) :
+        FunctionExecutor() {
+        override fun acquireParameter(): List<Parameter> {
+            return function.parameters.toList()
         }
 
-        fun doAccept(vararg cls: KClass<*>): Boolean {
-            val parameters = parameter()
-            return parameters.size == cls.size
-                    && cls.allIndexed { cls[it].isSuperclassOf(parameters[it].type.jvmErasure) }
+        override fun acquireReturnType(): Class<*> {
+            return function.returnType
         }
 
-        open fun invoke(vararg parameter: Any?) {
-            function.call(*parameter)
+        override fun getDeclaringClassName(): String {
+            return function.declaringClass.name
+        }
+
+        override fun getFunctionName(): String {
+            return function.name
+        }
+
+        override fun getFullName(): String {
+            return "${getDeclaringClassName()}#${getFunctionName()}"
+        }
+
+        override fun execute(args: List<Any>): Any? {
+            return function.invoke(instance, *args.toTypedArray())
+        }
+
+        override fun <T : Annotation> findAnnotation(type: Class<T>): T? {
+            return function.getAnnotation(type)
+        }
+    }
+
+    internal class ConstructorExecutor(private val constructor: Constructor<*>) :
+        FunctionExecutor() {
+        override fun acquireParameter(): List<Parameter> {
+            return constructor.parameters.toList()
+        }
+
+        override fun acquireReturnType(): Class<*> {
+            return constructor.declaringClass
+        }
+
+        override fun getDeclaringClassName(): String {
+            return constructor.declaringClass.name
+        }
+
+        override fun getFunctionName(): String {
+            return "${constructor.declaringClass.name}()"
+        }
+
+        override fun getFullName(): String {
+            return getFunctionName()
+        }
+
+        override fun execute(args: List<Any>): Any? {
+            return constructor.newInstance(*args.toTypedArray())
+        }
+
+        override fun <T : Annotation> findAnnotation(type: Class<T>): T? {
+            return constructor.getAnnotation(type)
+        }
+    }
+
+    open class CallableFunction(private val executor: FunctionExecutor) : FunctionExecutor() {
+        override fun acquireParameter(): List<Parameter> {
+            return executor.parameter()
+        }
+
+        override fun acquireReturnType(): Class<*> {
+            return executor.returnType()
+        }
+
+        override fun getDeclaringClassName(): String {
+            return executor.getDeclaringClassName()
+        }
+
+        override fun getFunctionName(): String {
+            return executor.getFunctionName()
+        }
+
+        override fun getFullName(): String {
+            return executor.getFullName()
+        }
+
+        override fun execute(args: List<Any>): Any? {
+            return executor.invoke(args)
+        }
+
+        override fun <T : Annotation> findAnnotation(type: Class<T>): T? {
+            return executor.findAnnotation(type)
+        }
+
+        fun <T : Annotation> findAnnotation(kls: KClass<T>): T? {
+            return findAnnotation(kls.java)
+        }
+
+        inline fun <reified T : Annotation> getAnnotation(): T? {
+            return findAnnotation(T::class)
         }
 
         fun asAutoMatchingFunction(): AutoMatchedCallableFunction {
-            return AutoMatchedCallableFunction(instance, function)
+            return AutoMatchedCallableFunction(executor)
         }
+
+        open fun doReturn(cls: Class<*>): Boolean {
+            return cls.isAssignableFrom(executor.returnType())
+        }
+
+        open fun doAccept(vararg cls: Class<*>): Boolean {
+            val parameters = executor.parameter()
+            return parameters.size == cls.size
+                    && cls.allIndexed { parameters[it].type.isAssignableFrom(cls[it]) }
+        }
+
     }
 
-    class AutoMatchedCallableFunction(instance: Any?, function: KFunction<*>) : CallableFunction(instance, function) {
+
+    class AutoMatchedCallableFunction(private val executor: FunctionExecutor) : CallableFunction(executor) {
         private val matched = mutableMapOf<String, KClass<*>>()
         private val strictMatched = mutableMapOf<String, KClass<*>>()
 
-        private class FieldProperty(val type: KClass<*>) {
-            // TODO
+        override fun execute(args: List<Any>): Any? {
+            return super.execute(args)
+        }
+
+        override fun doAccept(vararg cls: Class<*>): Boolean {
+            return super.doAccept(*cls)
         }
     }
 }
 
-fun <T : Any> KFunction<T>.asCallable(instance: Any? = null): ReflectionUtil.CallableFunction {
-    if (instance == null) {
-        return asSingletonCallable()
+fun <T : Class<*>> ReflectionUtil.ReflectionFilterContainer<T>.toMethodFilter(): ReflectionUtil.ReflectionFilterContainer<Method> {
+    val methodList = mutableListOf<Method>()
+    forEach {
+        try {
+            methodList += it.declaredMethods
+        } catch (e: Throwable) {
+            // Ignore if failed to get methods
+        }
     }
-    return ReflectionUtil.CallableFunction(instance, this)
+    return ReflectionUtil.filterMethod(methodList)
 }
 
-internal fun <T : Any> KFunction<T>.asSingletonCallable(): ReflectionUtil.CallableFunction {
-    if (JvmModifier.isStatic((javaMethod ?: javaConstructor)!!.modifiers)) {
-        return ReflectionUtil.CallableFunction(null, this)
+fun <T : Class<*>> ReflectionUtil.ReflectionFilterContainer<T>.toFieldFilter(): ReflectionUtil.ReflectionFilterContainer<Field> {
+    val methodList = mutableListOf<Field>()
+    forEach {
+        try {
+            methodList += it.declaredFields
+        } catch (e: Throwable) {
+            // Ignore if failed to get methods
+        }
     }
-    val declaringClass = (javaMethod ?: javaConstructor)!!.declaringClass.kotlin
-    if (declaringClass.isCompanion) {
-        return ReflectionUtil.CallableFunction(declaringClass.companionObject, this)
+    return ReflectionUtil.filterField(methodList)
+}
+
+fun Constructor<*>.asCallable(): ReflectionUtil.CallableFunction {
+    return ReflectionUtil.CallableFunction(ReflectionUtil.ConstructorExecutor(this))
+}
+
+fun Method.asCallable(instance: Any? = null): ReflectionUtil.CallableFunction {
+    return ReflectionUtil.CallableFunction(ReflectionUtil.DefaultFunctionExecutor(instance, this))
+}
+
+fun Method.asSingletonCallable(): ReflectionUtil.CallableFunction {
+    if (JvmModifier.isStatic(modifiers)) {
+        return ReflectionUtil.CallableFunction(ReflectionUtil.DefaultFunctionExecutor(null, this))
     }
-    declaringClass.objectInstance?.let { instance ->
-        return ReflectionUtil.CallableFunction(instance, this)
+    declaringClass.safeKotlin()?.apply {
+        if (isCompanion) {
+            return ReflectionUtil.CallableFunction(
+                ReflectionUtil.DefaultFunctionExecutor(
+                    companionObject,
+                    this@asSingletonCallable
+                )
+            )
+        }
+        objectInstance?.let { instance ->
+            return ReflectionUtil.CallableFunction(
+                ReflectionUtil.DefaultFunctionExecutor(
+                    instance,
+                    this@asSingletonCallable
+                )
+            )
+        }
     }
     throw IllegalStateException("Cannot convert instance required function to singleton callable")
 }
