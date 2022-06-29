@@ -1,10 +1,7 @@
 package skywolf46.extrautility.core.test.suites.arguments
 
+import org.junit.jupiter.api.*
 import org.junit.jupiter.api.Assertions.*
-import org.junit.jupiter.api.MethodOrderer
-import org.junit.jupiter.api.Order
-import org.junit.jupiter.api.Test
-import org.junit.jupiter.api.TestMethodOrder
 import skywolf46.extrautility.core.data.ArgumentStorage
 
 @TestMethodOrder(MethodOrderer.OrderAnnotation::class)
@@ -46,6 +43,9 @@ class ArgumentStorageTest {
         assertTrue(sharedArgument.findAll<String>().isNotEmpty())
         assertTrue(sharedArgument.findAll<Int>().isEmpty())
         assertTrue(sharedArgument.getAll(Int::class.java).isEmpty())
+        assertThrows<NullPointerException> {
+            sharedArgument.find<Int>()
+        }
     }
 
     @Test
