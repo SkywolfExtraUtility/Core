@@ -21,7 +21,7 @@ enum class ClassFilter : JvmFilter<Class<*>> {
 
     INSTANCE_REQUIRED {
         override fun isSatisfied(data: Class<*>): Boolean {
-            return !INSTANCE_REQUIRED.isSatisfied(data)
+            return !INSTANCE_NOT_REQUIRED.isSatisfied(data)
         }
     },
 
