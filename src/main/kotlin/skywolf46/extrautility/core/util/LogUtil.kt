@@ -1,5 +1,6 @@
 package skywolf46.extrautility.core.util
 
+import kotlin.reflect.KClass
 import kotlin.reflect.jvm.jvmName
 
 internal object LogUtil {
@@ -12,6 +13,9 @@ fun bindPrefixTo(cls: Class<*>, prefix: String) {
     prefixes[cls.name] = prefix
 }
 
+fun bindPrefixTo(cls: KClass<*>, prefix: String) {
+    bindPrefixTo(cls.java, prefix)
+}
 fun bindPrefix(prefix: String) {
     bindPrefix(StackTraceUtil.findLastStackTrace(LogUtil.classFilter)!!.className, prefix)
 }
@@ -31,6 +35,14 @@ fun findPrefixFor(packageName: String): String? {
     if (splitter == -1)
         return prefixes[packageName]
     return prefixes[packageName] ?: findPrefixFor(packageName.substring(0, splitter))
+}
+
+fun findPrefixFor(cls: Class<*>) : String? {
+    return findPrefixFor(cls.name)
+}
+
+fun findPrefixFor(kls: KClass<*>) : String? {
+    return findPrefixFor(kls.java)
 }
 
 fun appendPrefix(msg: String): String {
