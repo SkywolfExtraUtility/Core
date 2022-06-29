@@ -18,10 +18,9 @@ enum class MethodFilter : JvmFilter<Method> {
 
     INSTANCE_REQUIRED {
         override fun isSatisfied(data: Method): Boolean {
-            return !INSTANCE_REQUIRED.isSatisfied(data)
+            return !INSTANCE_NOT_REQUIRED.isSatisfied(data)
         }
     };
-
 
     enum class Modifier : JvmFilter<Method> {
         STATIC {
