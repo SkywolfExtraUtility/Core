@@ -5,7 +5,6 @@ import java.util.*
 object RandomUtil {
     private val internalRandom = Random()
 
-
     fun nextInt(min: Int, max: Int): Int {
         if (max < min)
             return nextInt(max, min)
