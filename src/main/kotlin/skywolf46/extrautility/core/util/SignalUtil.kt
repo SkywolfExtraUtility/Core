@@ -1,8 +1,12 @@
 package skywolf46.extrautility.core.util
 
 import skywolf46.extrautility.core.annotations.SignalReceiver
+import skywolf46.extrautility.core.data.UnregisterTrigger
 import skywolf46.extrautility.core.enumeration.reflection.MethodFilter
+import java.lang.reflect.Method
+import kotlin.reflect.KClass
 
+@Suppress("MemberVisibilityCanBePrivate")
 object SignalUtil {
     init {
         bindPrefix("ExtraUtility - Core/Signal | ")
@@ -12,22 +16,14 @@ object SignalUtil {
 
     @Suppress("UNCHECKED_CAST")
     internal fun init() {
-        ReflectionUtil.getMethodCache()
+        AutoRegistrationUtil.getMethodCache()
             .filter(MethodFilter.INSTANCE_NOT_REQUIRED)
             .requiresAny(SignalReceiver::class.java)
             .unlock()
             .forEach {
-                val callable = it.asCallable()
-                if (callable.parameterCount() == 0) {
-                    logError("Cannot register ${it.name} : No parameter found")
-                    return@forEach
+                register(it.asSingletonCallable()).message?.apply {
+                    logError(this)
                 }
-                if (callable.parameterCount() != 1) {
-                    logError("Cannot register ${it.name} : Signal listener cannot accept more than one parameter")
-                    return@forEach
-                }
-                val annotation = it.getAnnotation(SignalReceiver::class.java)
-                findContainer(callable.parameter()[0].type).register<Any>(annotation.priority, callable)
             }
     }
 
@@ -35,44 +31,152 @@ object SignalUtil {
         return signals.getOrPut(cls) { SignalPriorityContainer() }
     }
 
-    fun signal(data: Any) {
-        findContainer(data::class.java).onSignal(data)
+    fun <T : Any> signal(data: T): T {
+        return signal(data, false)
     }
 
-    fun signal(data: Any, forcedPriority: Int) {
-        findContainer(data::class.java).onSignal(data, forcedPriority)
+    fun <T : Any> signal(data: T, ignoreException: Boolean): T {
+        return findContainer(data::class.java).onSignal(data, ignoreException)
+    }
+
+    fun <T : Any> signal(data: T, forcedPriority: Int, ignoreException: Boolean): T {
+        return findContainer(data::class.java).onSignal(data, forcedPriority, ignoreException)
+    }
+
+    fun register(
+        callable: ReflectionUtil.CallableFunction
+    ): SignalReceiverResult {
+        val annotation = callable.function.getAnnotation(SignalReceiver::class.java)
+            ?: return SignalReceiverResult(
+                false,
+                "Cannot register ${callable.function.name} : Method receiver requires @SignalReceiver annotation"
+            )
+        if (callable.parameterCount() == 0) {
+            return SignalReceiverResult(false, "Cannot register ${callable.function.name} : No parameter found")
+        }
+        if (callable.parameterCount() != 1) {
+            return SignalReceiverResult(
+                false,
+                "Cannot register ${callable.function.name} : Signal listener cannot accept more than one parameter"
+            )
+        }
+        val trigger = findContainer(callable.parameter()[0].type).register<Any>(annotation.priority, callable)
+        return SignalReceiverResult(true, trigger = trigger)
+    }
+
+    fun <T : Any> register(signal: Class<T>, priority: Int, unit: (T) -> Unit) {
+        findContainer(signal).register(priority, unit)
+    }
+
+    fun <T : Any> register(signal: Class<T>, unit: (T) -> Unit) {
+        register(signal, 0, unit)
+    }
+
+    fun <T : Any> register(signal: KClass<T>, priority: Int, unit: (T) -> Unit) {
+        register(signal.java, priority, unit)
+    }
+
+    fun <T : Any> register(signal: KClass<T>, unit: (T) -> Unit) {
+        register(signal.java, unit)
+    }
+
+    fun register(target: Class<*>): SignalReceiverResultContainer {
+        val result = mutableMapOf<Method, SignalReceiverResult>()
+        ReflectionUtil.filterMethod(target.methods.toList())
+            .filter(MethodFilter.INSTANCE_NOT_REQUIRED)
+            .requiresAny(SignalReceiver::class.java)
+            .unlock()
+            .forEach {
+                result[it] = register(it.asSingletonCallable())
+            }
+        return SignalReceiverResultContainer(result)
+    }
+
+    fun register(target: KClass<*>): SignalReceiverResultContainer {
+        return register(target.java)
+    }
+
+    fun registerInstance(instance: Any): SignalReceiverResultContainer {
+        val result = mutableMapOf<Method, SignalReceiverResult>()
+        ReflectionUtil.filterMethod(instance::class.java.methods.toList())
+            .filter(MethodFilter.INSTANCE_REQUIRED)
+            .requiresAny(SignalReceiver::class.java)
+            .unlock()
+            .forEach {
+                result[it] = register(it.asCallable(instance))
+            }
+        return SignalReceiverResultContainer(result)
+    }
+
+    data class SignalReceiverResult(
+        val isSuccess: Boolean,
+        val message: String? = null,
+        private val trigger: UnregisterTrigger? = null
+    ) {
+        fun unregister() {
+            trigger?.invoke()
+        }
+    }
+
+    data class SignalReceiverResultContainer(val result: Map<Method, SignalReceiverResult>) {
+        fun unregisterAll() {
+            result.values.forEach {
+                it.unregister()
+            }
+        }
     }
 
     class SignalPriorityContainer {
         private val map = sortedMapOf<Int, MutableList<SignalReceiverContainer<Any>>>()
 
         @Suppress("UNCHECKED_CAST")
-        fun <T : Any> register(priority: Int, container: SignalReceiverContainer<T>) {
+        fun <T : Any> register(priority: Int, container: SignalReceiverContainer<T>): UnregisterTrigger {
             map.getOrPut(priority) { mutableListOf() }
                 .add(container as SignalReceiverContainer<Any>)
+            return UnregisterTrigger {
+                map[priority]!!.remove(container)
+            }
         }
 
         @Suppress("UNCHECKED_CAST")
-        fun <T : Any> register(priority: Int, caller: (T) -> Unit) {
-            register(priority, SignalReceiverContainer(caller as (Any) -> Unit))
+        fun <T : Any> register(priority: Int, caller: (T) -> Unit): UnregisterTrigger {
+            return register(priority, SignalReceiverContainer(caller as (Any) -> Unit))
         }
 
-        fun <T : Any> register(priority: Int, caller: ReflectionUtil.CallableFunction) {
-            register(priority, FunctionSignalReceiverContainer<T>(caller))
+        fun <T : Any> register(priority: Int, caller: ReflectionUtil.CallableFunction): UnregisterTrigger {
+            return register(priority, FunctionSignalReceiverContainer<T>(caller))
         }
 
-        fun onSignal(data: Any) {
+        fun <T : Any> onSignal(data: T, ignoreException: Boolean): T {
             map.values.forEach { listeners ->
                 listeners.forEach {
+                    if (ignoreException) {
+                        try {
+                            it.onSignal(data)
+                        } catch (e: Throwable) {
+                            e.printStackTrace()
+                        }
+                    } else {
+                        it.onSignal(data)
+                    }
+                }
+            }
+            return data
+        }
+
+        fun <T : Any> onSignal(data: T, priority: Int, ignoreException: Boolean): T {
+            map[priority]?.forEach {
+                if (ignoreException) {
+                    try {
+                        it.onSignal(data)
+                    } catch (e: Throwable) {
+                        e.printStackTrace()
+                    }
+                } else {
                     it.onSignal(data)
                 }
             }
-        }
-
-        fun onSignal(data: Any, priority: Int) {
-            map[priority]?.forEach {
-                it.onSignal(data)
-            }
+            return data
         }
     }
 
@@ -86,12 +190,12 @@ object SignalUtil {
         SignalReceiverContainer<T>({ callable.invoke(it) })
 }
 
-fun <T : Any> T.signal(): T {
-    SignalUtil.signal(this)
+fun <T : Any> T.signal(ignoreException: Boolean = false): T {
+    SignalUtil.signal(this, ignoreException)
     return this
 }
 
-fun <T : Any> T.signal(forcedPriority: Int): T {
-    SignalUtil.signal(this, forcedPriority)
+fun <T : Any> T.signal(forcedPriority: Int, ignoreException: Boolean = false): T {
+    SignalUtil.signal(this, forcedPriority, ignoreException)
     return this
 }
