@@ -8,13 +8,21 @@ internal object LogUtil {
 
 private val prefixes = mutableMapOf<String, String>()
 
+fun bindPrefixTo(cls: Class<*>, prefix: String) {
+    prefixes[cls.name] = prefix
+}
+
+fun bindPrefix(prefix: String) {
+    bindPrefix(StackTraceUtil.findLastStackTrace(LogUtil.classFilter)!!.className, prefix)
+}
+
 fun bindPrefix(classPackage: String, prefix: String) {
     prefixes[classPackage] = prefix
 }
 
 fun findPrefix(): String? {
     val packageName =
-        StackTraceUtil.findLastStackTrace(LogUtil.classFilter)!!.className.substringBeforeLast('.')
+        StackTraceUtil.findLastStackTrace(LogUtil.classFilter)!!.className
     return findPrefixFor(packageName)
 }
 
