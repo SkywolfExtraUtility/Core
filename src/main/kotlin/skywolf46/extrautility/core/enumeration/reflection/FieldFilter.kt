@@ -17,7 +17,7 @@ enum class FieldFilter : JvmFilter<Field> {
 
     INSTANCE_REQUIRED {
         override fun isSatisfied(data: Field): Boolean {
-            return !INSTANCE_REQUIRED.isSatisfied(data)
+            return !INSTANCE_NOT_REQUIRED.isSatisfied(data)
         }
     };
 
