@@ -20,10 +20,6 @@ repositories {
         url = uri(rootProject.properties["reposilite.release"])
         allowInsecureProtocol(true)
     }
-    maven {
-        url = uri(rootProject.properties["reposilite.spigot"])
-        allowInsecureProtocol(true)
-    }
 }
 
 
