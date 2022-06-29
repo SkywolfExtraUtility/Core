@@ -46,18 +46,18 @@ object SignalUtil {
     fun register(
         callable: ReflectionUtil.CallableFunction
     ): SignalReceiverResult {
-        val annotation = callable.function.getAnnotation(SignalReceiver::class.java)
+        val annotation = callable.findAnnotation(SignalReceiver::class.java)
             ?: return SignalReceiverResult(
                 false,
-                "Cannot register ${callable.function.name} : Method receiver requires @SignalReceiver annotation"
+                "Cannot register ${callable.getFullName()} : Method receiver requires @SignalReceiver annotation"
             )
         if (callable.parameterCount() == 0) {
-            return SignalReceiverResult(false, "Cannot register ${callable.function.name} : No parameter found")
+            return SignalReceiverResult(false, "Cannot register ${callable.getFullName()} : No parameter found")
         }
         if (callable.parameterCount() != 1) {
             return SignalReceiverResult(
                 false,
-                "Cannot register ${callable.function.name} : Signal listener cannot accept more than one parameter"
+                "Cannot register ${callable.getFullName()} : Signal listener cannot accept more than one parameter"
             )
         }
         val trigger = findContainer(callable.parameter()[0].type).register<Any>(annotation.priority, callable)
@@ -187,7 +187,7 @@ object SignalUtil {
     }
 
     class FunctionSignalReceiverContainer<T : Any>(callable: ReflectionUtil.CallableFunction) :
-        SignalReceiverContainer<T>({ callable.invoke(it) })
+        SignalReceiverContainer<T>({ callable.invoke(mutableListOf(it)) })
 }
 
 fun <T : Any> T.signal(ignoreException: Boolean = false): T {
