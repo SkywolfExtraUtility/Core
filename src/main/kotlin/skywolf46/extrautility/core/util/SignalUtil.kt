@@ -81,15 +81,14 @@ object SignalUtil {
     }
 
     fun register(target: Class<*>): SignalReceiverResultContainer {
-        val result = mutableMapOf<Method, SignalReceiverResult>()
-        ReflectionUtil.filterMethod(target.methods.toList())
+        return ReflectionUtil.filterMethod(target.methods.toList())
             .filter(MethodFilter.INSTANCE_NOT_REQUIRED)
             .requiresAny(SignalReceiver::class.java)
             .unlock()
-            .forEach {
-                result[it] = register(it.asSingletonCallable())
+            .associateWith {
+                register(it.asSingletonCallable())
             }
-        return SignalReceiverResultContainer(result)
+            .let(::SignalReceiverResultContainer)
     }
 
     fun register(target: KClass<*>): SignalReceiverResultContainer {
@@ -97,15 +96,14 @@ object SignalUtil {
     }
 
     fun registerInstance(instance: Any): SignalReceiverResultContainer {
-        val result = mutableMapOf<Method, SignalReceiverResult>()
-        ReflectionUtil.filterMethod(instance::class.java.methods.toList())
+        return ReflectionUtil.filterMethod(instance::class.java.methods.toList())
             .filter(MethodFilter.INSTANCE_REQUIRED)
             .requiresAny(SignalReceiver::class.java)
             .unlock()
-            .forEach {
-                result[it] = register(it.asCallable(instance))
+            .associateWith {
+                register(it.asCallable(instance))
             }
-        return SignalReceiverResultContainer(result)
+            .let(::SignalReceiverResultContainer)
     }
 
     data class SignalReceiverResult(
