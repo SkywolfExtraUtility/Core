@@ -1,5 +1,11 @@
 package skywolf46.extrautility.core.util
 
+
+fun <T : Any> MutableList<T>.append(data: T): MutableList<T> {
+    add(data)
+    return this
+}
+
 inline fun <T : Any> Iterable<T>.allIndexed(unit: T.(Int) -> Boolean): Boolean {
     if (this is Collection && isEmpty())
         return true
