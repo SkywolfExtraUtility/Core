@@ -3,30 +3,33 @@ package skywolf46.extrautility.core.util
 import io.github.classgraph.ClassGraph
 import skywolf46.extrautility.core.abstraction.JvmFilter
 import skywolf46.extrautility.core.definition.JvmModifier
+import java.lang.reflect.AnnotatedElement
+import java.lang.reflect.Field
+import java.lang.reflect.Method
 import kotlin.reflect.*
-import kotlin.reflect.full.*
-import kotlin.reflect.jvm.isAccessible
-import kotlin.reflect.jvm.javaConstructor
-import kotlin.reflect.jvm.javaMethod
-import kotlin.reflect.jvm.jvmErasure
+import kotlin.reflect.full.companionObject
+import kotlin.reflect.full.isSuperclassOf
+import kotlin.reflect.jvm.*
 
 object ReflectionUtil {
     val ignoreList = mutableListOf<String>()
     private val classLoaders = mutableListOf<ClassLoader>()
-    private var classCache: ReflectionFilterContainer<KClass<*>>? = null
-    private var methodCache: ReflectionFilterContainer<KFunction<*>>? = null
-    private var fieldCache: ReflectionFilterContainer<KProperty<*>>? = null
+    private var classCache: ReflectionFilterContainer<Class<*>>? = null
+    private var methodCache: ReflectionFilterContainer<Method>? = null
+    private var fieldCache: ReflectionFilterContainer<Field>? = null
 
     fun getClassCache(
         reloadClasses: Boolean = false,
         replaceClassLoader: Boolean = true
-    ): ReflectionFilterContainer<KClass<*>> {
+    ): ReflectionFilterContainer<Class<*>> {
         if (classCache == null || reloadClasses) {
             classCache = filterClass(
                 ClassGraph()
                     .apply {
                         if (replaceClassLoader)
-                            overrideClassLoaders(*classLoaders.toTypedArray())
+                            overrideClassLoaders(
+                                *classLoaders.toMutableList().append(javaClass.classLoader).toTypedArray()
+                            )
                         else
                             for (x in classLoaders)
                                 addClassLoader(x)
@@ -34,7 +37,7 @@ object ReflectionUtil {
                     .enableClassInfo()
                     .enableAnnotationInfo()
                     .scan()
-                    .allClasses.loadClasses().map { it.kotlin })
+                    .allClasses.loadClasses())
         }
         return classCache!!
     }
@@ -43,11 +46,14 @@ object ReflectionUtil {
         reloadCache: Boolean = false,
         replaceClassLoader: Boolean = true,
         forceReloadClassCache: Boolean = false
-    ): ReflectionFilterContainer<KFunction<*>> {
+    ): ReflectionFilterContainer<Method> {
         if (methodCache == null || reloadCache) {
-            methodCache = ReflectionFilterContainer(mutableListOf<KFunction<*>>().apply {
-                getClassCache(forceReloadClassCache, replaceClassLoader).forEach {
-                    this += it.declaredFunctions
+            methodCache = ReflectionFilterContainer(mutableListOf<Method>().apply {
+                getClassCache(forceReloadClassCache, replaceClassLoader).forEach { cls ->
+                    cls.declaredMethods.forEach {
+                        if (it != null)
+                            this += it
+                    }
                 }
             })
         }
@@ -60,28 +66,42 @@ object ReflectionUtil {
         forceReloadClassCache: Boolean = false
     ) {
         if (fieldCache == null || reloadCache) {
-            fieldCache = ReflectionFilterContainer(mutableListOf<KProperty<*>>().apply {
+            fieldCache = ReflectionFilterContainer(mutableListOf<Field>().apply {
                 getClassCache(forceReloadClassCache, replaceClassLoader).forEach {
-                    this += it.declaredMemberProperties
-                    this += it.declaredMemberExtensionProperties
+                    this += it.declaredFields
                 }
             })
         }
     }
 
-    fun filterClass(classes: List<KClass<*>>): ReflectionFilterContainer<KClass<*>> {
+    fun filterClass(classes: List<Class<*>>): ReflectionFilterContainer<Class<*>> {
         return ReflectionFilterContainer(classes)
     }
 
-    fun filterFunction(properties: List<KFunction<*>>): ReflectionFilterContainer<KFunction<*>> {
+    fun filterFunction(properties: List<Method>): ReflectionFilterContainer<Method> {
         return ReflectionFilterContainer(properties)
     }
 
-    fun filterField(properties: List<KProperty<*>>): ReflectionFilterContainer<KProperty<*>> {
+    fun filterField(properties: List<Field>): ReflectionFilterContainer<Field> {
         return ReflectionFilterContainer(properties)
     }
 
-    class ReflectionFilterContainer<T : KAnnotatedElement>(private val data: List<T>) : Iterable<T> {
+    fun findParentClasses(cls: Class<out Any>): List<Class<out Any>> {
+        val classes = mutableListOf<Class<out Any>>()
+        var clsOrig: Class<*>? = cls
+        do {
+            if (clsOrig == null)
+                return classes.distinct()
+            classes += clsOrig
+            for (x in clsOrig.interfaces) {
+                classes += findParentClasses(x)
+            }
+            clsOrig = clsOrig.superclass
+        } while (clsOrig != Any::class.java)
+        return classes.distinct()
+    }
+
+    class ReflectionFilterContainer<T : AnnotatedElement>(private val data: List<T>) : Iterable<T> {
         fun unlock(): ReflectionFilterContainer<T> {
             if (data.isEmpty() || data[0] !is KCallable<*>)
                 return this
@@ -97,11 +117,11 @@ object ReflectionUtil {
             )
         }
 
-        fun requiresAny(vararg annotation: Class<Annotation>): ReflectionFilterContainer<T> {
+        fun requiresAny(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
                     for (x in annotation)
-                        if (it.findAnnotations(x.kotlin).isNotEmpty()) {
+                        if (it.getAnnotationsByType(x).isNotEmpty()) {
                             return@filter true
                         }
                     return@filter false
@@ -109,11 +129,11 @@ object ReflectionUtil {
             )
         }
 
-        fun requires(vararg annotation: Class<Annotation>): ReflectionFilterContainer<T> {
+        fun requires(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
                     for (x in annotation)
-                        if (it.findAnnotations(x.kotlin).isEmpty()) {
+                        if (it.getAnnotationsByType(x).isEmpty()) {
                             return@filter false
                         }
                     return@filter true
@@ -121,11 +141,11 @@ object ReflectionUtil {
             )
         }
 
-        fun requiresNot(vararg annotation: Class<Annotation>): ReflectionFilterContainer<T> {
+        fun requiresNot(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
                     for (x in annotation)
-                        if (it.findAnnotations(x.kotlin).isNotEmpty()) {
+                        if (it.getAnnotationsByType(x).isNotEmpty()) {
                             return@filter false
                         }
                     return@filter true
@@ -138,7 +158,7 @@ object ReflectionUtil {
         }
     }
 
-    class CallableFunction<T>(val instance: Any?, val function: KFunction<*>) {
+    open class CallableFunction(val instance: Any?, val function: KFunction<*>) {
         fun parameter(): List<KParameter> {
             return function.parameters
         }
@@ -157,20 +177,33 @@ object ReflectionUtil {
                     && cls.allIndexed { cls[it].isSuperclassOf(parameters[it].type.jvmErasure) }
         }
 
-        fun invoke(vararg parameter: Any?) {
+        open fun invoke(vararg parameter: Any?) {
+            function.call(*parameter)
+        }
+
+        fun asAutoMatchingFunction(): AutoMatchedCallableFunction {
+            return AutoMatchedCallableFunction(instance, function)
+        }
+    }
+
+    class AutoMatchedCallableFunction(instance: Any?, function: KFunction<*>) : CallableFunction(instance, function) {
+        private val matched = mutableMapOf<String, KClass<*>>()
+        private val strictMatched = mutableMapOf<String, KClass<*>>()
+
+        private class FieldProperty(val type: KClass<*>) {
             // TODO
         }
     }
 }
 
-fun <T : Any> KFunction<T>.asCallable(instance: Any? = null): ReflectionUtil.CallableFunction<T> {
+fun <T : Any> KFunction<T>.asCallable(instance: Any? = null): ReflectionUtil.CallableFunction {
     if (instance == null) {
         return asSingletonCallable()
     }
     return ReflectionUtil.CallableFunction(instance, this)
 }
 
-internal fun <T : Any> KFunction<T>.asSingletonCallable(): ReflectionUtil.CallableFunction<T> {
+internal fun <T : Any> KFunction<T>.asSingletonCallable(): ReflectionUtil.CallableFunction {
     if (JvmModifier.isStatic((javaMethod ?: javaConstructor)!!.modifiers)) {
         return ReflectionUtil.CallableFunction(null, this)
     }
@@ -182,4 +215,37 @@ internal fun <T : Any> KFunction<T>.asSingletonCallable(): ReflectionUtil.Callab
         return ReflectionUtil.CallableFunction(instance, this)
     }
     throw IllegalStateException("Cannot convert instance required function to singleton callable")
+}
+
+fun <T : Any> Class<T>.findParentClasses(): List<Class<out Any>> {
+    return ReflectionUtil.findParentClasses(this)
+}
+
+
+fun <T : Any> KClass<T>.findParentClasses(): List<KClass<out Any>> {
+    return java.findParentClasses().map { x -> x.kotlin }
+}
+
+fun Class<*>.safeKotlin(): KClass<*>? {
+    return try {
+        kotlin
+    } catch (e: Throwable) {
+        null
+    }
+}
+
+fun Method.safeKotlin(): KFunction<*>? {
+    return try {
+        kotlinFunction
+    } catch (e: Throwable) {
+        null
+    }
+}
+
+fun Field.safeKotlin(): KProperty<*>? {
+    return try {
+        kotlinProperty
+    } catch (e: Throwable) {
+        null
+    }
 }
