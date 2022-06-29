@@ -1,8 +1,8 @@
 package skywolf46.extrautility.core.test.data
 
-import org.junit.jupiter.api.Assertions
 import org.junit.jupiter.api.Assertions.assertFalse
 import org.junit.jupiter.api.Assertions.assertTrue
+import skywolf46.extrautility.core.annotations.RejectAutoRegister
 import skywolf46.extrautility.core.annotations.SignalReceiver
 import skywolf46.extrautility.core.test.exceptions.TestFailedException
 
@@ -32,9 +32,14 @@ object TestSignalObject {
         throw TestFailedException()
     }
 
-
     @SignalReceiver
     private fun onSignalButWillFailed() {
+        throw TestFailedException()
+    }
+
+    @SignalReceiver
+    @RejectAutoRegister
+    private fun onSignalButRequiresRejected() {
         throw TestFailedException()
     }
 }
