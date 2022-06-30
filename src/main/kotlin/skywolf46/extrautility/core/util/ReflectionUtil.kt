@@ -35,7 +35,6 @@ object ReflectionUtil {
                                 addClassLoader(x)
                     }
                     .enableClassInfo()
-                    .enableAnnotationInfo()
                     .scan()
                     .allClasses.loadClasses())
         }
@@ -48,15 +47,15 @@ object ReflectionUtil {
         forceReloadClassCache: Boolean = false
     ): ReflectionFilterContainer<Method> {
         if (methodCache == null || reloadCache) {
-            methodCache = ReflectionFilterContainer(mutableListOf<Method>().apply {
-                getClassCache(forceReloadClassCache, replaceClassLoader).forEach { cls ->
+            methodCache =
+                ReflectionFilterContainer(getClassCache(forceReloadClassCache, replaceClassLoader).flatMap { cls ->
                     try {
-                        this += cls.declaredMethods
+                        cls.declaredMethods.toList()
                     } catch (e: Throwable) {
                         // Ignore if failed to get methods
+                        emptyList()
                     }
-                }
-            })
+                })
         }
         return methodCache!!
     }
@@ -67,15 +66,15 @@ object ReflectionUtil {
         forceReloadClassCache: Boolean = false
     ) {
         if (fieldCache == null || reloadCache) {
-            fieldCache = ReflectionFilterContainer(mutableListOf<Field>().apply {
-                getClassCache(forceReloadClassCache, replaceClassLoader).forEach {
+            fieldCache =
+                ReflectionFilterContainer(getClassCache(forceReloadClassCache, replaceClassLoader).flatMap { cls ->
                     try {
-                        this += it.declaredFields
+                        cls.declaredFields.toList()
                     } catch (e: Throwable) {
                         // Ignore if failed to get methods
+                        emptyList()
                     }
-                }
-            })
+                })
         }
     }
 
@@ -108,10 +107,10 @@ object ReflectionUtil {
 
     class ReflectionFilterContainer<T : AnnotatedElement>(private val data: List<T>) : Iterable<T> {
         fun unlock(): ReflectionFilterContainer<T> {
-            if (data.isEmpty() || data[0] !is AccessibleObject)
-                return this
-            data.forEach {
-                (it as AccessibleObject).isAccessible = true
+            if (data.isNotEmpty() && data[0] is AccessibleObject) {
+                data.forEach {
+                    (it as AccessibleObject).isAccessible = true
+                }
             }
             return this
         }
@@ -125,11 +124,7 @@ object ReflectionUtil {
         fun requiresAny(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
-                    for (x in annotation)
-                        if (it.getAnnotationsByType(x).isNotEmpty()) {
-                            return@filter true
-                        }
-                    return@filter false
+                    return@filter annotation.any { annotation -> it.getAnnotationsByType(annotation).isNotEmpty() }
                 }
             )
         }
@@ -137,11 +132,7 @@ object ReflectionUtil {
         fun requires(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
-                    for (x in annotation)
-                        if (it.getAnnotationsByType(x).isEmpty()) {
-                            return@filter false
-                        }
-                    return@filter true
+                    return@filter annotation.none { annotation -> it.getAnnotationsByType(annotation).isEmpty() }
                 }
             )
         }
@@ -149,11 +140,7 @@ object ReflectionUtil {
         fun requiresNot(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
-                    for (x in annotation)
-                        if (it.getAnnotationsByType(x).isNotEmpty()) {
-                            return@filter false
-                        }
-                    return@filter true
+                    return@filter annotation.none { annotation -> it.getAnnotationsByType(annotation).isNotEmpty() }
                 }
             )
         }
@@ -342,27 +329,15 @@ object ReflectionUtil {
 }
 
 fun <T : Class<*>> ReflectionUtil.ReflectionFilterContainer<T>.toMethodFilter(): ReflectionUtil.ReflectionFilterContainer<Method> {
-    val methodList = mutableListOf<Method>()
-    forEach {
-        try {
-            methodList += it.declaredMethods
-        } catch (e: Throwable) {
-            // Ignore if failed to get methods
-        }
-    }
-    return ReflectionUtil.filterMethod(methodList)
+    return ReflectionUtil.filterMethod(flatMap<T, Method> {
+        kotlin.runCatching { it.declaredMethods.toList() }.getOrElse { emptyList() }
+    })
 }
 
 fun <T : Class<*>> ReflectionUtil.ReflectionFilterContainer<T>.toFieldFilter(): ReflectionUtil.ReflectionFilterContainer<Field> {
-    val methodList = mutableListOf<Field>()
-    forEach {
-        try {
-            methodList += it.declaredFields
-        } catch (e: Throwable) {
-            // Ignore if failed to get methods
-        }
-    }
-    return ReflectionUtil.filterField(methodList)
+    return ReflectionUtil.filterField(flatMap<T, Field> {
+        kotlin.runCatching { it.declaredFields.toList() }.getOrElse { emptyList() }
+    })
 }
 
 fun Constructor<*>.asCallable(): ReflectionUtil.CallableFunction {
