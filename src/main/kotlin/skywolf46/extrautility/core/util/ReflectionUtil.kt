@@ -165,12 +165,12 @@ object ReflectionUtil {
 
         internal abstract fun getFullName(): String
 
-        protected abstract fun execute(args: List<Any>): Any?
+        protected abstract fun execute(args: List<Any?>): Any?
 
         abstract fun <T : Annotation> findAnnotation(type: Class<T>): T?
 
 
-        fun invoke(args: List<Any>): Any? {
+        fun invoke(args: List<Any?>): Any? {
             try {
                 return execute(args)
             } catch (e: InvocationTargetException) {
@@ -220,7 +220,7 @@ object ReflectionUtil {
             return "${getDeclaringClassName()}#${getFunctionName()}"
         }
 
-        override fun execute(args: List<Any>): Any? {
+        override fun execute(args: List<Any?>): Any? {
             return function.invoke(instance, *args.toTypedArray())
         }
 
@@ -251,7 +251,7 @@ object ReflectionUtil {
             return getFunctionName()
         }
 
-        override fun execute(args: List<Any>): Any? {
+        override fun execute(args: List<Any?>): Any? {
             return constructor.newInstance(*args.toTypedArray())
         }
 
@@ -281,7 +281,7 @@ object ReflectionUtil {
             return executor.getFullName()
         }
 
-        override fun execute(args: List<Any>): Any? {
+        override fun execute(args: List<Any?>): Any? {
             return executor.invoke(args)
         }
 
@@ -318,7 +318,7 @@ object ReflectionUtil {
         private val matched = mutableMapOf<String, KClass<*>>()
         private val strictMatched = mutableMapOf<String, KClass<*>>()
 
-        override fun execute(args: List<Any>): Any? {
+        override fun execute(args: List<Any?>): Any? {
             return super.execute(args)
         }
 
