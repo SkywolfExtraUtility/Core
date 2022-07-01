@@ -1,8 +1,8 @@
 package skywolf46.extrautility.core
 
 import skywolf46.extrautility.core.util.CharacterUtil
+import skywolf46.extrautility.core.util.InjectionUtil
 import skywolf46.extrautility.core.util.SignalUtil
-import java.io.File
 
 object ExtraUtilityCore {
     private var initialized = false
@@ -13,9 +13,6 @@ object ExtraUtilityCore {
         initialized = true
         CharacterUtil.init()
         SignalUtil.init()
-    }
-
-    fun applyAddon(jar: File) {
-
+        InjectionUtil.init()
     }
 }

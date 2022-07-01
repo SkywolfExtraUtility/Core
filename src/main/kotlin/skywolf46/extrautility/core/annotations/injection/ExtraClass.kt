@@ -8,4 +8,6 @@ package skywolf46.extrautility.core.annotations.injection
  *  and must have to instantiated with [skywolf46.extrautility.core.util.InjectionUtil.instantiate] method.
  *  This operation can be replaced with [skywolf46.extrautility.core.util.instantiate] global extension.
  */
+@Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
 annotation class ExtraClass()

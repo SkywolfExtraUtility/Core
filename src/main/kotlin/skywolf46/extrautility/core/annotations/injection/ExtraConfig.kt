@@ -18,4 +18,5 @@ package skywolf46.extrautility.core.annotations.injection
  * Automatic field injection instance can be added on [skywolf46.extrautility.core.signals.pre.BeforeClassInjectSignal] signal.
  */
 @Target(AnnotationTarget.CLASS)
+@Retention(AnnotationRetention.RUNTIME)
 annotation class ExtraConfig
