@@ -4,6 +4,14 @@ plugins {
     id 'org.jetbrains.kotlinx.kover' version '0.5.0'
 }
 
+sourceCompatibility = targetCompatibility = "1.8"
+
+compileKotlin {
+    kotlinOptions {
+        jvmTarget = "1.8"
+    }
+}
+
 configurations {
     include
     compileOnly {
@@ -54,8 +62,8 @@ publishing {
 }
 
 dependencies {
-    include "org.jetbrains.kotlin:kotlin-stdlib"
-    include group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
+    implementation "org.jetbrains.kotlin:kotlin-stdlib-jdk8"
+    implementation group: 'org.jetbrains.kotlin', name: 'kotlin-reflect'
     include group: "io.github.classgraph", name: 'classgraph', version: '4.8.126'
     testImplementation('org.junit.jupiter:junit-jupiter-engine:5.8.2')
     testImplementation('org.junit.jupiter:junit-jupiter-params:5.8.2')
