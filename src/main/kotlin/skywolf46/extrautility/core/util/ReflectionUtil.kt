@@ -325,7 +325,8 @@ object ReflectionUtil {
                 matched[x] = executor.parameter()[x].type
             }
         }
-        fun execute(args: ArgumentStorage) {
+
+        fun execute(args: ArgumentStorage) : Any?{
             val parameters = mutableListOf<Any?>()
             for (x in 0 until parameterCount()) {
                 parameters += null
@@ -335,7 +336,7 @@ object ReflectionUtil {
                 classCounter[v] = classCounter.getOrElse(v) { 0 } + 1
                 parameters[k] = args.getAll(v).getOrNull(classCounter[v]!!)
             }
-            invoke(parameters)
+            return invoke(parameters)
         }
     }
 }
