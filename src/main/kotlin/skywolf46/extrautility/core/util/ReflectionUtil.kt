@@ -2,6 +2,7 @@ package skywolf46.extrautility.core.util
 
 import io.github.classgraph.ClassGraph
 import skywolf46.extrautility.core.abstraction.JvmFilter
+import skywolf46.extrautility.core.data.ArgumentStorage
 import skywolf46.extrautility.core.definition.JvmModifier
 import java.lang.reflect.*
 import kotlin.reflect.KClass
@@ -314,16 +315,27 @@ object ReflectionUtil {
     }
 
 
-    class AutoMatchedCallableFunction(private val executor: FunctionExecutor) : CallableFunction(executor) {
-        private val matched = mutableMapOf<String, KClass<*>>()
-        private val strictMatched = mutableMapOf<String, KClass<*>>()
+    class AutoMatchedCallableFunction(executor: FunctionExecutor) : CallableFunction(executor) {
+        private val matched = mutableMapOf<Int, Class<*>>()
+        // TODO
+        private val strictMatched = mutableMapOf<Int, Pair<String, Class<*>>>()
 
-        override fun execute(args: List<Any?>): Any? {
-            return super.execute(args)
+        init {
+            for(x in 0 until parameterCount()) {
+                matched[x] = executor.parameter()[x].type
+            }
         }
-
-        override fun doAccept(vararg cls: Class<*>): Boolean {
-            return super.doAccept(*cls)
+        fun execute(args: ArgumentStorage) {
+            val parameters = mutableListOf<Any?>()
+            for (x in 0 until parameterCount()) {
+                parameters += null
+            }
+            val classCounter = mutableMapOf<Class<*>, Int>()
+            matched.forEach { (k, v) ->
+                classCounter[v] = classCounter.getOrElse(v) { 0 } + 1
+                parameters[k] = args.getAll(v).getOrNull(classCounter[v]!!)
+            }
+            invoke(parameters)
         }
     }
 }
