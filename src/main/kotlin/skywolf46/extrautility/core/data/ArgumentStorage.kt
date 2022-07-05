@@ -1,3 +1,5 @@
+@file:Suppress("UNCHECKED_CAST")
+
 package skywolf46.extrautility.core.data
 
 import skywolf46.extrautility.core.util.findParentClasses
@@ -14,21 +16,21 @@ class ArgumentStorage : Cloneable {
         return namedArgument[name]
     }
 
-    operator fun get(kls: KClass<out Any>): Any? {
-        return classArgument[kls]?.getOrNull(0)
+    operator fun <T : Any> get(kls: KClass<T>): T? {
+        return classArgument[kls]?.getOrNull(0) as T?
     }
 
-    operator fun get(cls: Class<out Any>): Any? {
+    operator fun <T : Any> get(cls: Class<T>): T? {
         return get(cls.kotlin)
     }
 
-    fun getAll(kls: KClass<out Any>): List<Any> {
+    fun <T: Any> getAll(kls: KClass<T>): List<T> {
         if (classArgument[kls] == null)
             return emptyList()
-        return classArgument[kls]!!.toList()
+        return classArgument[kls]!!.toList() as List<T>
     }
 
-    fun getAll(cls: Class<out Any>): List<Any> {
+    fun <T: Any> getAll(cls: Class<T>): List<T> {
         return getAll(cls.kotlin)
     }
 
@@ -122,12 +124,12 @@ class ArgumentStorage : Cloneable {
     }
 
     inline fun <reified T : Any> findNullable(): T? {
-        return get(T::class) as T?
+        return get(T::class)
     }
 
     @Suppress("UNCHECKED_CAST")
     inline fun <reified T : Any> findAll(): List<T> {
-        return getAll(T::class) as List<T>
+        return getAll(T::class)
     }
 
     operator fun plusAssign(arg: Any) {
