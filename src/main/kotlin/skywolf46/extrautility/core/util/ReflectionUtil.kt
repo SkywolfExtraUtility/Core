@@ -341,7 +341,7 @@ object ReflectionUtil {
             val classCounter = mutableMapOf<Class<*>, Int>()
             matched.forEach { (k, v) ->
                 classCounter[v] = classCounter.getOrElse(v) { 0 } + 1
-                parameters[k] = args.getAll(v).getOrNull(classCounter[v]!!)
+                parameters[k] = args.getAll(v).getOrNull(classCounter[v]!! - 1)
             }
             return invoke(parameters)
         }
