@@ -160,11 +160,11 @@ object ReflectionUtil {
 
         internal abstract fun acquireReturnType(): Class<*>
 
-        internal abstract fun getDeclaringClassName(): String
+        abstract fun getDeclaringClassName(): String
 
-        internal abstract fun getFunctionName(): String
+        abstract fun getFunctionName(): String
 
-        internal abstract fun getFullName(): String
+        abstract fun getFullName(): String
 
         protected abstract fun execute(args: List<Any?>): Any?
 
@@ -317,16 +317,17 @@ object ReflectionUtil {
 
     class AutoMatchedCallableFunction(executor: FunctionExecutor) : CallableFunction(executor) {
         private val matched = mutableMapOf<Int, Class<*>>()
+
         // TODO
         private val strictMatched = mutableMapOf<Int, Pair<String, Class<*>>>()
 
         init {
-            for(x in 0 until parameterCount()) {
+            for (x in 0 until parameterCount()) {
                 matched[x] = executor.parameter()[x].type
             }
         }
 
-        fun execute(args: ArgumentStorage) : Any?{
+        fun execute(args: ArgumentStorage): Any? {
             val parameters = mutableListOf<Any?>()
             for (x in 0 until parameterCount()) {
                 parameters += null
