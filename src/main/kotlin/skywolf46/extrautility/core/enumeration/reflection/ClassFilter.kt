@@ -15,7 +15,7 @@ enum class ClassFilter : JvmFilter<Class<*>> {
                 kls.isCompanion || kls.objectInstance != null
             } catch (e: Throwable) {
                 false
-            }
+            } && !BLUEPRINT.isSatisfied(data)
         }
     },
 
