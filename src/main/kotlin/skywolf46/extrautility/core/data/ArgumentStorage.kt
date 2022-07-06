@@ -12,25 +12,34 @@ class ArgumentStorage : Cloneable {
 
     private var classArgument = mutableMapOf<KClass<out Any>, MutableList<Any>>()
 
+    private val proxies = mutableListOf<ArgumentStorage>()
+
+    private val proxiesReversed = proxies.asReversed()
+
     operator fun get(name: String): Any? {
         return namedArgument[name]
     }
 
     operator fun <T : Any> get(kls: KClass<T>): T? {
-        return classArgument[kls]?.getOrNull(0) as T?
+        return getAll(kls).getOrNull(0)
     }
 
     operator fun <T : Any> get(cls: Class<T>): T? {
         return get(cls.kotlin)
     }
 
-    fun <T: Any> getAll(kls: KClass<T>): List<T> {
+    fun <T : Any> getAll(kls: KClass<T>): List<T> {
+        proxiesReversed.forEach {
+            val proxied = it.getAll(kls)
+            if (proxied.isNotEmpty())
+                return proxied
+        }
         if (classArgument[kls] == null)
             return emptyList()
         return classArgument[kls]!!.toList() as List<T>
     }
 
-    fun <T: Any> getAll(cls: Class<T>): List<T> {
+    fun <T : Any> getAll(cls: Class<T>): List<T> {
         return getAll(cls.kotlin)
     }
 
