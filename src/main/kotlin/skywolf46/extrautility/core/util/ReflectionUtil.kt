@@ -122,6 +122,12 @@ object ReflectionUtil {
             )
         }
 
+        fun filterNot(filter: JvmFilter<T>): ReflectionFilterContainer<T> {
+            return ReflectionFilterContainer(
+                data.filter { !filter.isSatisfied(it) }
+            )
+        }
+
         fun requiresAny(vararg annotation: Class<out Annotation>): ReflectionFilterContainer<T> {
             return ReflectionFilterContainer(
                 data.filter {
