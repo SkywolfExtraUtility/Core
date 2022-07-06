@@ -16,6 +16,26 @@ class ArgumentStorage : Cloneable {
 
     private val proxiesReversed = proxies.asReversed()
 
+    fun addProxy(proxy: ArgumentStorage): ArgumentStorage {
+        if (containsProxy(proxy)) {
+            throw IllegalStateException("Proxy already registered")
+        }
+        proxies += proxy
+        return this
+    }
+
+    fun removeProxy(proxy: ArgumentStorage): ArgumentStorage {
+        proxies -= proxy
+        return this
+    }
+
+    private fun containsProxy(proxy: ArgumentStorage): Boolean {
+        if (proxy == this || proxies.any { it.containsProxy(proxy) }) {
+            return true
+        }
+        return false
+    }
+
     operator fun get(name: String): Any? {
         return namedArgument[name]
     }
