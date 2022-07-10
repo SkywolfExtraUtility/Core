@@ -2,6 +2,7 @@ package skywolf46.extrautility.core.util
 
 import org.jetbrains.annotations.NotNull
 import skywolf46.extrautility.core.annotations.injection.*
+import skywolf46.extrautility.core.data.ArgumentStorage
 import skywolf46.extrautility.core.enumeration.Stage
 import skywolf46.extrautility.core.enumeration.reflection.ClassFilter
 import skywolf46.extrautility.core.enumeration.reflection.MethodFilter
@@ -109,9 +110,18 @@ object InjectionUtil {
         return classRegistration[target]?.instantiate(Stage.POST) as T?
     }
 
+    @Suppress("UNCHECKED_CAST")
+    fun <T> instantiateWith(target: Class<T>, args: ArgumentStorage): T? {
+        autoRegistration[target]?.apply {
+            return this as T
+        }
+        return classRegistration[target]?.instantiateWith(Stage.POST, args) as T?
+    }
+
     fun <T : Any> get(target: Class<T>): T {
         return instantiate(target)!!
     }
+
 
     private class ClassAnalysisData(cls: Class<*>) {
         private val constructor: ReflectionUtil.CallableFunction
@@ -142,13 +152,26 @@ object InjectionUtil {
                         logError("")
                     }
                 }.filter { it.parameterCount == 0 }.apply {
-                    initializingFunction = filter { x -> x.getAnnotation(AfterInitialize::class.java).stage == Stage.PRE }
-                    postInitializingFunction = filter { x -> x.getAnnotation(AfterInitialize::class.java).stage == Stage.POST }
+                    initializingFunction =
+                        filter { x -> x.getAnnotation(AfterInitialize::class.java).stage == Stage.PRE }
+                    postInitializingFunction =
+                        filter { x -> x.getAnnotation(AfterInitialize::class.java).stage == Stage.POST }
                 }
         }
 
         fun instantiate(initStage: Stage?): Any {
             val parameter = constructorRequirements.map { instantiate(it.cls) }
+            val data = constructor.invoke(parameter)!!
+            injectFields.forEach { (k, v) ->
+                k.set(data, instantiate(v))
+            }
+            if (initStage != null)
+                invokeInitializer(initStage, data)
+            return data
+        }
+
+        fun instantiateWith(initStage: Stage?, args: ArgumentStorage): Any {
+            val parameter = constructorRequirements.map { args[it.cls] ?: instantiate(it.cls) }
             val data = constructor.invoke(parameter)!!
             injectFields.forEach { (k, v) ->
                 k.set(data, instantiate(v))
@@ -189,4 +212,8 @@ object InjectionUtil {
 
 inline fun <reified T : Any> instantiate(): T {
     return InjectionUtil.instantiate(T::class.java) as T
+}
+
+inline fun <reified T : Any> instantiateWith(args: ArgumentStorage): T {
+    return InjectionUtil.instantiateWith(T::class.java, args) as T
 }
