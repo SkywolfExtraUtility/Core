@@ -19,6 +19,10 @@ object ReflectionUtil {
     private var methodCache: ReflectionFilterContainer<Method>? = null
     private var fieldCache: ReflectionFilterContainer<Field>? = null
 
+    fun addClassLoader(loader: ClassLoader) {
+        classLoaders += loader
+    }
+
     fun getClassCache(
         reloadClasses: Boolean = false,
         replaceClassLoader: Boolean = true
